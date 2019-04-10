@@ -42,6 +42,25 @@ class functionsTest extends SparkTest {
     an [NullPointerException] should be thrownBy plusDays(null, 5)
   }
 
+  test("addColumns to a DataFrame") {
+    val inputDF = Seq(("a", "b", "c"), ("d", "e", "f")).toDF("dfCol1", "dfCol2", "dfCol3")
+    val resultDF = inputDF.addColumns(("dfCol1plus1", ('dfCol1 + 1)), ("dfCol2x2", ($"dfCol2" * 2)))
+
+    // test column names and values are as expected
+    resultDF.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "dfCol3", "dfCol1plus1", "dfCol2x2")
+    resultDF.where('dfCol1plus1 =!= ('dfCol1 + 1) or 'dfCol2x2 =!= ('dfCol2 * 2)).count shouldEqual 0
+  }
+
+  test("renameColumns within a DataFrame" ) {
+    val inputDF = Seq((1, 2, 3), (2, 4, 8)).toDF("dfCol1", "dfCol2", "dfCol3")
+    val resultDF = inputDF.renameColumns(Map("dfCol1" -> "col1", "dfCol2" -> "col2").toSeq: _*)
+    val expectedDF = Seq((1, 2, 3), (2, 4, 8)).toDF("col11", "col2", "dfCol3")
+
+    // test column names and values are as expected
+    resultDF.columns should contain theSameElementsAs Array("col1", "col2", "dfCol3")
+    resultDF.collect should contain theSameElementsAs expectedDF.collect
+  }
+
 }
 
 object functionsTest {
