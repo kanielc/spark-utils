@@ -49,6 +49,11 @@ class functionsTest extends SparkTest {
     // test column names and values are as expected
     resultDF.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "dfCol3", "dfCol1plus1", "dfCol2x2")
     resultDF.where('dfCol1plus1 =!= ('dfCol1 + 1) or 'dfCol2x2 =!= ('dfCol2 * 2)).count shouldEqual 0
+
+    // with dataset as well
+    Seq(TestData("a", 7), TestData("b", 3)).toDS()
+      .addColumns("a" -> 'y * 10, "b" -> ('y + 100))
+      .select('a, 'b).as[(Int, Int)].collect should contain theSameElementsAs Array((70, 107), (30, 103))
   }
 
   test("renameColumns within a DataFrame" ) {
@@ -59,6 +64,11 @@ class functionsTest extends SparkTest {
     // test column names and values are as expected
     resultDF.columns should contain theSameElementsAs Array("col1", "col2", "dfCol3")
     resultDF.collect should contain theSameElementsAs expectedDF.collect
+
+    // with dataset as well
+    Seq(TestData("a", 7), TestData("b", 3)).toDS()
+      .renameColumns("x" -> "a", "y" -> "b")
+      .select('a, 'b).as[(String, Int)].collect should contain theSameElementsAs Array(("a", 7), ("b", 3))
   }
 
 }
