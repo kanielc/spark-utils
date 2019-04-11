@@ -7,7 +7,7 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, Dataset, Encoder}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe._
 
@@ -63,6 +63,30 @@ package object functions {
       if (conv == null)
         deduped.asInstanceOf[Dataset[T]]
       else deduped.as[T](conv)
+    }
+
+    /**
+      * Add multiple new columns to the current DataFrame
+      * (i.e., `withColumn` for a sequence of (String, Column) Tuples).
+      *
+      * @param newColTuples - a list of name-value Tuples2 (colName: String, colVal: Column).
+      * @return - The DataFrame with new columns added.
+      */
+    def addColumns(newColTuples: (String, Column)*): DataFrame = newColTuples.foldLeft(ds.toDF()) {
+      // From left to right, for each new (colName, colVal) Tuple add it to the current DataFrame
+      case (newDF, (colName, colVal)) => newDF.withColumn(colName, colVal)
+    }
+
+    /**
+      * Rename multiple new columns of the current DataFrame
+      * (i.e., `withColumnRenamed` for a sequence of (String, String) Tuples).
+      *
+      * @param renameColTuples - a list of current, new column name Tuples2 (currColName: String, newColName: String).
+      * @return - The DataFrame with mulitple renamed columns.
+      */
+    def renameColumns(renameColTuples: (String, String)*): DataFrame = renameColTuples.foldLeft(ds.toDF()) {
+      // From left to right, for each new (currColName, newColName) Tuple apply withColumnRenamed
+      case (newDF, (currColName, newColName)) => newDF.withColumnRenamed(currColName, newColName)
     }
   }
 }
