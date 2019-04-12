@@ -3,10 +3,12 @@ package com.jakainas
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+import com.jakainas.table.{Table, TableConfig}
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Column, Dataset, Encoder, SparkSession}
 import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe._
@@ -40,7 +42,7 @@ package object functions {
     LocalDate.parse(date, DateTimeFormatter.ISO_DATE).minusDays(-numDays).toString
   }
 
-  implicit class DatasetFunctions[T](val ds: Dataset[T]) {
+  implicit class DatasetFunctions[T](val ds: Dataset[T]) extends AnyVal {
     /**
       * Remove duplicate rows using some column criteria for grouping and ordering
       * @param partCols - How to group rows.  Only 1 row from each group will be in the result
@@ -87,6 +89,18 @@ package object functions {
     def renameColumns(renameColTuples: (String, String)*): DataFrame = renameColTuples.foldLeft(ds.toDF()) {
       // From left to right, for each new (currColName, newColName) Tuple apply withColumnRenamed
       case (newDF, (currColName, newColName)) => newDF.withColumnRenamed(currColName, newColName)
+    }
+
+    def save()(implicit table: Table[T]): Unit = {
+      ds.write.partitionBy(table.partitioning:_*).parquet(table.fullPath)
+    }
+  }
+
+  implicit class SparkFunctions(val spark: SparkSession) extends AnyVal {
+    def load[T : Encoder : Table]: Dataset[T] = {
+      val table = implicitly[Table[T]]
+
+      spark.read.option("basePath", table.basePath).parquet(table.fullPath).as[T]
     }
   }
 }

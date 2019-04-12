@@ -1,8 +1,11 @@
 package com.jakainas.functions
 
-import com.jakainas.functions.functionsTest.TestData
+import com.jakainas.table.{DailyPartitioning, Table, TableConfig}
+import com.jakainas.utils.SparkTest
+import org.apache.commons.io.FileUtils
 
 class functionsTest extends SparkTest {
+  import functionsTest._
   import org.apache.spark.sql.functions._
   import spark.implicits._
 
@@ -71,8 +74,29 @@ class functionsTest extends SparkTest {
       .select('a, 'b).as[(String, Int)].collect should contain theSameElementsAs Array(("a", 7), ("b", 3))
   }
 
+  test("save and load works for tables") {
+    val raw = Seq(PartData("a", 7, 2019, 1, 10), PartData("b", 3, 2018, 2, 5))
+
+    FileUtils.deleteDirectory(new java.io.File("/tmp/footables/"))
+    raw.toDS.save()
+    spark.read.parquet("/tmp/footables/part-data").as[PartData].collect() should contain theSameElementsAs raw
+    spark.load[PartData].collect() should contain theSameElementsAs raw
+    FileUtils.deleteDirectory(new java.io.File("/tmp/footables"))
+  }
 }
 
 object functionsTest {
   case class TestData(x: String, y: Int)
+  object TestData {
+    implicit val tableConf = new Table[TestData] with DailyPartitioning with LogTables
+  }
+
+  case class PartData(x: String, y: Int, year: Int, month: Int, day: Int)
+  object PartData {
+    implicit val tableConf: Table[PartData] = new Table[PartData] with DailyPartitioning with LogTables
+  }
+
+  trait LogTables extends TableConfig {
+    override def basePath: String = "/tmp/footables"
+  }
 }
