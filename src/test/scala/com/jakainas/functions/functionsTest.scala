@@ -45,6 +45,29 @@ class functionsTest extends SparkTest {
     an [NullPointerException] should be thrownBy plusDays(null, 5)
   }
 
+  test("to_date_str: numeric input, should give normal output"){
+    Seq(("2019", "04", "10")).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
+      .as[String].collect  should contain theSameElementsAs Array("2019-04-10")
+
+    Seq((2019, 4, 10)).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
+      .as[String].collect  should contain theSameElementsAs Array("2019-04-10")
+  }
+
+  test("to_date_str: text input, should return null"){
+    Seq(("2019", "Four", "Ten")).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
+      .as[String].collect  should contain theSameElementsAs Array(null)
+  }
+
+  test("to_date_str: null input, should return null"){
+    Seq(("2019", "04", null)).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
+      .as[String].collect  should contain theSameElementsAs Array(null)
+  }
+
+  test("to_date_str: out of range input, should return null"){
+    Seq(("2019", "13", "32")).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
+      .as[String].collect  should contain theSameElementsAs Array(null)
+  }
+    
   test("addColumns to a DataFrame") {
     val inputDF = Seq((1, 2, 3), (2, 4, 8)).toDF("dfCol1", "dfCol2", "dfCol3")
     val resultDF = inputDF.addColumns(("dfCol1plus1", ('dfCol1 + 1)), ("dfCol2x2", ($"dfCol2" * 2)))

@@ -42,6 +42,18 @@ package object functions {
     LocalDate.parse(date, DateTimeFormatter.ISO_DATE).minusDays(-numDays).toString
   }
 
+    /**
+    * Generate a string Date column by combining year, month, and day columns.
+    * If one or more column is null, the result Date will be null.
+    * @param year - the year column
+    * @param month - the month column
+    * @param day - the day column
+    * @return a string column consist of the combination of year, month, and day into date
+    */
+  def to_date_str(year: Column, month: Column, day: Column): Column = {
+    date_format(concat(year, lit("-"), month, lit("-"), day), "yyyy-MM-dd")
+  }
+  
   implicit class DatasetFunctions[T](val ds: Dataset[T]) extends AnyVal {
     /**
       * Remove duplicate rows using some column criteria for grouping and ordering
