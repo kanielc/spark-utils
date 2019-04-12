@@ -103,4 +103,5 @@ package object functions {
       spark.read.option("basePath", table.basePath).parquet(table.fullPath).as[T]
     }
   }
+
 }
