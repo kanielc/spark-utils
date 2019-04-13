@@ -56,11 +56,13 @@ package object functions {
   }
 
   /**
+   * Today as a string in UTC
    * @return Today's date in UTC(String)
    */
   def today: String = LocalDate.now().toString
 
   /**
+   * Yesterday as a string in UTC
    * @return Yesterday's date in UTC(String)
    */
   def yesterday: String = LocalDate.now().minusDays(1).toString
@@ -77,7 +79,7 @@ package object functions {
     date_format(concat(year, lit("-"), month, lit("-"), day), "yyyy-MM-dd")
   }
 
-  implicit class DatasetFunctions[T](val ds: Dataset[T]) extends AnyVal {
+  implicit class DatasetFunctions[T](private val ds: Dataset[T]) extends AnyVal {
     /**
      * Remove duplicate rows using some column criteria for grouping and ordering
      * @param partCols - How to group rows.  Only 1 row from each group will be in the result
