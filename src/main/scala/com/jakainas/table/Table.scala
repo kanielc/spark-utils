@@ -1,5 +1,7 @@
 package com.jakainas.table
 
+import org.apache.spark.sql.types.StructType
+
 import scala.reflect.runtime.universe
 
 object Table {
@@ -15,6 +17,7 @@ object Table {
 abstract class Table[T: universe.TypeTag] extends TableConfig {
   type Table = T
   override val tableName: String = Table.defaultTableName[T]
+  override val schema: StructType = com.jakainas.functions.schemaFor[T]
 
   def fullPath: String = {
     def fix(s: String) = s.replaceAll("/+$", "")

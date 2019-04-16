@@ -6,6 +6,12 @@ cache:
     - $HOME/.ivy2
     - $HOME/spark
     - $HOME/.sbt/launchers
+
+branches:
+  only:
+    - master
+    - /v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+
 jdk:
   - openjdk8
 scala:
@@ -19,6 +25,7 @@ addons:
 
 before_install:
   - export PATH=$HOME/.local/bin:$PATH
+
 install:
   # Download spark 2.3.2
   - "[ -f spark ] || mkdir spark && cd spark && axel https://archive.apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz && cd .."

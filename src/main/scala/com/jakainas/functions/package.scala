@@ -23,6 +23,12 @@ package object functions {
   def nvl[C1](c: C1, default: Any)(implicit ev: C1 => Column): Column = when(c.isNotNull, c).otherwise(default)
 
   /**
+   * Provides a literal of String with a value of null
+   * @return `null` as a column of type String
+   */
+  def null_string: Column = lit(null.asInstanceOf[String])
+
+  /**
    * Returns the schema for a type (e.g. case class, string, etc)
    * @tparam T - The type whose schema is to be returned
    * @return The schema for a Dataset built with that type
@@ -39,7 +45,17 @@ package object functions {
    * @return numDays after (or before if negative) `date`
    */
   def plusDays(date: String, numDays: Int): String = {
-    LocalDate.parse(date, DateTimeFormatter.ISO_DATE).minusDays(-numDays).toString
+    parseDate(date).minusDays(-numDays).toString
+  }
+
+  /**
+   * Converts a date string to a LocalDate
+   *
+   * @param date - date string to convert in the format of '2019-01-20'
+   * @return LocalDate representation of the given date
+   */
+  def parseDate(date: String): LocalDate = {
+    LocalDate.parse(date, DateTimeFormatter.ISO_DATE)
   }
 
   /**
@@ -50,7 +66,7 @@ package object functions {
    * @return The dates between start and end in the form of a sequence of strings
    */
   def dateRange(start: String, end: String): IndexedSeq[String] = {
-    val days = ChronoUnit.DAYS.between(LocalDate.parse(start, DateTimeFormatter.ISO_DATE), LocalDate.parse(end, DateTimeFormatter.ISO_DATE)).toInt
+    val days = ChronoUnit.DAYS.between(parseDate(start), parseDate(end)).toInt
     require(days >= 0, s"Start date ($start) must be before end date ($end)!")
     (0 to days).map(d => plusDays(start, d))
   }
@@ -134,10 +150,38 @@ package object functions {
   }
 
   implicit class SparkFunctions(val spark: SparkSession) extends AnyVal {
-    def load[T: Encoder: Table]: Dataset[T] = {
+    /**
+     * Dynamically loads a case class representing a table from its provided location
+     * @param date - What specific date partition to load from (will only use year, month, day as available in schema) - Optional
+     * @tparam T - The type to load, must have a `Table` definition available
+     * @return Dataset of T representing data from the given path
+     */
+    def load[T: Encoder: Table](date: String = null): Dataset[T] = {
       val table = implicitly[Table[T]]
 
-      spark.read.option("basePath", table.basePath).parquet(table.fullPath).as[T]
+      val data = spark.read.option("basePath", table.basePath).parquet(table.fullPath)
+
+      Option(date).map { date =>
+        val dateVal = parseDate(date)
+        val schema = table.schema
+        val filters = Seq("year", "month", "day")
+
+        schema.collect {
+          case f if filters.contains(f.name) =>
+            f.name match {
+              case "year" => s"year = ${dateVal.getYear}"
+              case "month" => s"month = ${dateVal.getMonthValue}"
+              case "day" => s"day = ${dateVal.getDayOfMonth}"
+            }
+        }.mkString(" and ")
+      }.fold(data) { filt => data.where(filt) }.as[T]
     }
+
+    /**
+     * Loads CSV file(s) from a given location, including header and inferring schema
+     * @param paths - single or multiple file locations to load CSV data from
+     * @return Dataset[Row] containing the data in the CSVs
+     */
+    def readCsv(paths: String*): Dataset[Row] = spark.read.options(Map("header" -> "true", "inferSchema" -> "true")).csv(paths: _*)
   }
 }

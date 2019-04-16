@@ -1,5 +1,7 @@
 package com.jakainas.functions
 
+import java.io.File
+
 import com.jakainas.table.{DailyPartitioning, Table, TableConfig}
 import com.jakainas.utils.SparkTest
 import org.apache.commons.io.FileUtils
@@ -80,6 +82,10 @@ class functionsTest extends SparkTest {
       .as[String].collect should contain theSameElementsAs Array(null)
   }
 
+  test("can add a null string lit") {
+    Seq("a", "b", "c").toDF("a").withColumn("b", null_string).select('b).distinct().as[String].collect should contain theSameElementsAs Array(null)
+  }
+
   test("to_date_str: out of range input, should return null") {
     Seq(("2019", "13", "32")).toDF("year", "month", "day").select(to_date_str('year, 'month, 'day))
       .as[String].collect should contain theSameElementsAs Array(null)
@@ -115,14 +121,44 @@ class functionsTest extends SparkTest {
       .select('a, 'b).as[(String, Int)].collect should contain theSameElementsAs Array(("a", 7), ("b", 3))
   }
 
+  test("tables return the correct schema") {
+    val schema = schemaFor[PartData]
+    implicitly[Table[PartData]].schema shouldEqual schema
+  }
+
+  test("load csv file into dataframe") {
+    val raw = Seq(PartData("a", 7, 2019, 1, 10), PartData("b", 3, 2018, 2, 5))
+
+    val csvData =
+      """
+        |x,y,year,month,day
+        |a,7,2019,1,10
+        |b,3,2018,2,5
+      """.stripMargin
+    FileUtils.deleteDirectory(new File("/tmp/footables/"))
+    FileUtils.writeStringToFile(new File("/tmp/footables/test.csv"), csvData)
+    spark.readCsv("/tmp/footables/test.csv").as[PartData].collect() should contain theSameElementsAs raw
+    FileUtils.deleteDirectory(new File("/tmp/footables"))
+  }
+
   test("save and load works for tables") {
     val raw = Seq(PartData("a", 7, 2019, 1, 10), PartData("b", 3, 2018, 2, 5))
 
-    FileUtils.deleteDirectory(new java.io.File("/tmp/footables/"))
+    FileUtils.deleteDirectory(new File("/tmp/footables/"))
     raw.toDS.save()
     spark.read.parquet("/tmp/footables/part-data").as[PartData].collect() should contain theSameElementsAs raw
-    spark.load[PartData].collect() should contain theSameElementsAs raw
-    FileUtils.deleteDirectory(new java.io.File("/tmp/footables"))
+    spark.load[PartData]().collect() should contain theSameElementsAs raw
+    FileUtils.deleteDirectory(new File("/tmp/footables"))
+  }
+
+  test("load works with date filter") {
+    val expected = PartData("b", 3, 2018, 2, 5)
+    val raw = Seq(PartData("a", 7, 2019, 1, 10), expected)
+
+    FileUtils.deleteDirectory(new File("/tmp/footables/"))
+    raw.toDS.save()
+    spark.load[PartData]("2018-02-05").collect.head shouldEqual expected
+    FileUtils.deleteDirectory(new File("/tmp/footables"))
   }
 }
 
@@ -130,7 +166,7 @@ object functionsTest {
   case class TestData(x: String, y: Int)
   object TestData {
     implicit val tableConf = new Table[TestData] with DailyPartitioning with LogTables
-  }
+}
 
   case class PartData(x: String, y: Int, year: Int, month: Int, day: Int)
   object PartData {
