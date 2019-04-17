@@ -5,6 +5,7 @@ import java.io.File
 import com.jakainas.table.{DailyPartitioning, Table, TableConfig}
 import com.jakainas.utils.SparkTest
 import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.Row
 
 class functionsTest extends SparkTest {
   import functionsTest._
@@ -48,11 +49,11 @@ class functionsTest extends SparkTest {
   }
 
   test("return a list of dates between two given dates") {
-    dateRange("2018-01-10","2018-01-10") shouldEqual Seq("2018-01-10")
-    dateRange("2018-01-10","2018-01-14") shouldEqual Seq("2018-01-10","2018-01-11","2018-01-12","2018-01-13","2018-01-14")
-    dateRange("2018-01-30", "2018-02-04") shouldEqual Seq("2018-01-30","2018-01-31","2018-02-01","2018-02-02","2018-02-03","2018-02-04")
-    dateRange("2018-12-25", "2019-01-05") shouldEqual Seq("2018-12-25","2018-12-26","2018-12-27","2018-12-28","2018-12-29","2018-12-30","2018-12-31","2019-01-01","2019-01-02","2019-01-03","2019-01-04","2019-01-05")
-    an [IllegalArgumentException] should be thrownBy dateRange("2018-01-14", "2018-01-10")
+    dateRange("2018-01-10", "2018-01-10") shouldEqual Seq("2018-01-10")
+    dateRange("2018-01-10", "2018-01-14") shouldEqual Seq("2018-01-10", "2018-01-11", "2018-01-12", "2018-01-13", "2018-01-14")
+    dateRange("2018-01-30", "2018-02-04") shouldEqual Seq("2018-01-30", "2018-01-31", "2018-02-01", "2018-02-02", "2018-02-03", "2018-02-04")
+    dateRange("2018-12-25", "2019-01-05") shouldEqual Seq("2018-12-25", "2018-12-26", "2018-12-27", "2018-12-28", "2018-12-29", "2018-12-30", "2018-12-31", "2019-01-01", "2019-01-02", "2019-01-03", "2019-01-04", "2019-01-05")
+    an[IllegalArgumentException] should be thrownBy dateRange("2018-01-14", "2018-01-10")
   }
 
   test("return today's date") {
@@ -160,13 +161,58 @@ class functionsTest extends SparkTest {
     spark.load[PartData]("2018-02-05").collect.head shouldEqual expected
     FileUtils.deleteDirectory(new File("/tmp/footables"))
   }
+
+  test("count one column") {
+    val inputDF = Seq(10, 20, 30, 20).toDF("dfCol1")
+
+    val resultDF = inputDF.frequency('dfCol1) // test column input
+    val resultDF1 = inputDF.frequency("dfCol1") // test string input
+
+    val expectedDF = Array(Row(20, 2), Row(10, 1), Row(30, 1))
+
+    resultDF.columns should contain theSameElementsAs Array("dfCol1", "count")
+    resultDF.collect should contain theSameElementsAs expectedDF
+
+    resultDF1.columns should contain theSameElementsAs Array("dfCol1", "count")
+    resultDF1.collect should contain theSameElementsAs expectedDF
+  }
+
+  test("count columns") {
+    val inputDF = Seq((10, 20, 30), (20, 30, 40), (20, 30, 40)).toDF("dfCol1", "dfCol2", "dfCol3")
+
+    val resultDF = inputDF.frequency('dfCol1, 'dfCol2, 'dfCol3) //test column input
+    val resultDF1 = inputDF.frequency("dfCol1", "dfCol2", "dfCol3") // test string input
+
+    val expectedDF = Array(Row(20, 30, 40, 2), Row(10, 20, 30, 1))
+
+    resultDF.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "dfCol3", "count")
+    resultDF.collect should contain theSameElementsAs expectedDF
+
+    resultDF1.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "dfCol3", "count")
+    resultDF1.collect should contain theSameElementsAs expectedDF
+  }
+
+  test("count unique column") {
+    val inputDF = Seq((10, 20), (20, 30)).toDF("dfCol1", "dfCol2")
+
+    val resultDF = inputDF.frequency('dfCol1, 'dfCol2) //test column input
+    val resultDF1 = inputDF.frequency("dfCol1", "dfCol2") // test string input
+
+    val expectedDF = Seq(Row(10, 20, 1), Row(20, 30, 1))
+
+    resultDF.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "count")
+    resultDF.collect should contain theSameElementsAs expectedDF
+
+    resultDF1.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "count")
+    resultDF1.collect should contain theSameElementsAs expectedDF
+  }
 }
 
 object functionsTest {
   case class TestData(x: String, y: Int)
   object TestData {
     implicit val tableConf = new Table[TestData] with DailyPartitioning with LogTables
-}
+  }
 
   case class PartData(x: String, y: Int, year: Int, month: Int, day: Int)
   object PartData {

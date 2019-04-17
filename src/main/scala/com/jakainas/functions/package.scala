@@ -96,6 +96,8 @@ package object functions {
   }
 
   implicit class DatasetFunctions[T](private val ds: Dataset[T]) extends AnyVal {
+    import ds.sparkSession.implicits._
+
     /**
      * Remove duplicate rows using some column criteria for grouping and ordering
      * @param partCols - How to group rows.  Only 1 row from each group will be in the result
@@ -146,6 +148,27 @@ package object functions {
 
     def save()(implicit table: Table[T]): Unit = {
       ds.write.partitionBy(table.partitioning: _*).parquet(table.fullPath)
+    }
+
+    /**
+     * Calculate the frequency of given columns and sort them in descending order
+     *
+     * @param  columns - column(s) to count by
+     * @return - Dataframe with given columns soft by descending order of count
+     */
+    def frequency(columns: Column*): DataFrame = {
+      ds.groupBy(columns: _*).agg(count("*") as "count").sort('count.desc)
+    }
+
+    /**
+     * Calculate the frequency of given columns and sort them in descending order
+     *
+     * @param col1 - First column to group by
+     * @param cols - remaining columns to count by (Optional)
+     * @return - The DataFrame with columns and the respective frequency of the columns
+     */
+    def frequency(col1: String, cols: String*): DataFrame = {
+      ds.groupBy(col1, cols: _*).agg(count("*") as "count").sort('count.desc)
     }
   }
 
