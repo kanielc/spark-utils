@@ -95,6 +95,13 @@ package object functions {
     date_format(concat(year, lit("-"), month, lit("-"), day), "yyyy-MM-dd")
   }
 
+  /**
+    * Converts a timestamp into bigint (long) in milliseconds (default Spark returns only seconds)
+    * @param timestamp - Timestamp to extract milliseconds from
+    * @return Milliseconds since epoch for given timestamp
+    */
+  def millis(timestamp: Column): Column = (timestamp.cast("double") * 1000).cast("bigint")
+
   implicit class DatasetFunctions[T](private val ds: Dataset[T]) extends AnyVal {
     import ds.sparkSession.implicits._
 

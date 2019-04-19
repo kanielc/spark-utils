@@ -206,6 +206,13 @@ class functionsTest extends SparkTest {
     resultDF1.columns should contain theSameElementsAs Array("dfCol1", "dfCol2", "count")
     resultDF1.collect should contain theSameElementsAs expectedDF
   }
+
+  test("converts timestamp to milliseconds") {
+    Seq("2019-04-19 00:55:05.131", "2016-02-16 13:35:05.178").toDF("time")
+      .withColumn("ts", 'time.cast("timestamp"))
+      .withColumn("value", millis('ts))
+      .select('value).as[Long].collect() should contain theSameElementsAs Array(1555635305131L, 1455629705178L)
+  }
 }
 
 object functionsTest {
