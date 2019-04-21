@@ -213,6 +213,18 @@ class functionsTest extends SparkTest {
       .withColumn("value", millis('ts))
       .select('value).as[Long].collect() should contain theSameElementsAs Array(1555635305131L, 1455629705178L)
   }
+
+  test("return a range of dates as an SQL query") {
+    dateRangeToSql("2017-01-09", "2017-01-09") shouldEqual "year = 2017 and month = 1 and day = 9"
+    dateRangeToSql("2018-11-01", "2018-11-29") shouldEqual "(year = 2018 and (month = 11 and day between 1 and 29))"
+    dateRangeToSql("2018-11-15", "2018-12-15") shouldEqual "(year = 2018 and ((month = 11 and day >= 15) or (month = 12 and day <= 15)))"
+    dateRangeToSql("2017-01-09", "2019-04-10") shouldEqual "(year = 2017 and (month > 1 or (month = 1 and day >= 9))) or (year = 2018) or (year = 2019 and (month < 4 or (month = 4 and day <= 10)))"
+    dateRangeToSql("2015-01-09", "2019-04-10") shouldEqual "(year = 2015 and (month > 1 or (month = 1 and day >= 9))) or (year between 2016 and 2018) or (year = 2019 and (month < 4 or (month = 4 and day <= 10)))"
+    dateRangeToSql("2019-04-10", "2015-01-09") shouldEqual "(year = 2015 and (month > 1 or (month = 1 and day >= 9))) or (year between 2016 and 2018) or (year = 2019 and (month < 4 or (month = 4 and day <= 10)))"
+    dateRangeToSql("2018-11-15", "2018-11-16") shouldEqual "(year = 2018 and (month = 11 and day between 15 and 16))"
+    dateRangeToSql("2018-01-15", "2018-08-09") shouldEqual "(year = 2018 and ((month = 1 and day >= 15) or (month between 2 and 7) or (month = 8 and day <= 9)))"
+    dateRangeToSql("2016-01-15", "2019-11-17") shouldEqual "(year = 2016 and (month > 1 or (month = 1 and day >= 15))) or (year between 2017 and 2018) or (year = 2019 and (month < 11 or (month = 11 and day <= 17)))"
+  }
 }
 
 object functionsTest {

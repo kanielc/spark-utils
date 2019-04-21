@@ -1,5 +1,6 @@
 package com.jakainas
 
+import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -96,6 +97,68 @@ package object functions {
   }
 
   /**
+   * Convert a dateRange into its corresponding SQL query
+   * dateRangeToSql("2017-01-09", "2019-04-10") returns: "(year = 2017 and month > 1) or (year = 2017 and month = 1 and day >= 9) or year = 2018 or (year = 2019 and ((month < 4) or (month = 4 and day <= 10)))"
+   * @param date1 - some date ('yyyy-mm-dd')
+   * @param date2 - some date ('yyyy-mm-dd')
+   * @return SQL query in string form
+   */
+  def dateRangeToSql(date1: String, date2: String): String = {
+    def expandDate(date: String) = {
+      val d = LocalDate.parse(date, DateTimeFormatter.ISO_DATE)
+      Seq(d.getYear, d.getMonthValue, d.getDayOfMonth)
+    }
+
+    def range(start: Int, end: Int) = end - start match {
+      case 2 => Seq(start + 1)
+      case x if x > 2 => Seq(start + 1, end - 1)
+      case _ => Seq.empty
+    }
+
+    val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
+    val check = dateFormat.parse(date1).compareTo(dateFormat.parse(date2))
+
+    check match {
+      case 0 =>
+        val start = expandDate(date2)
+        s"year = ${start.head} and month = ${start(1)} and day = ${start(2)}"
+      case x if x > 0 =>
+        dateRangeToSql(date2, date1)
+      case _ =>
+        val start = expandDate(date1)
+        val end = expandDate(date2)
+
+        val fullYears = range(start.head, end.head)
+
+        val startSpec = s"(year = ${start.head} and (month > ${start(1)} or (month = ${start(1)} and day >= ${start(2)})))"
+        val endSpec = s"(year = ${end.head} and (month < ${end(1)} or (month = ${end(1)} and day <= ${end(2)})))"
+
+        val midYears = fullYears.length match {
+          case 0 => " and "
+          case 1 => s" or (year = ${fullYears.head}) or "
+          case _ => s" or (year between ${fullYears.head} and ${fullYears.last}) or "
+        }
+
+        if (fullYears.nonEmpty) {
+          s"$startSpec$midYears$endSpec"
+        } else {
+          val monthDay = if (start(1) == end(1)) {
+            s"(month = ${start(1)} and day between ${start(2)} and ${end(2)})"
+          } else {
+            val midMonthText = {
+              val fullMonths = range(start(1), end(1))
+              if (fullMonths.nonEmpty) s" or (month between ${fullMonths.head} and ${fullMonths.last})" else ""
+            }
+
+            s"((month = ${start(1)} and day >= ${start(2)})$midMonthText or (month = ${end(1)} and day <= ${end(2)}))"
+          }
+
+          s"(year = ${start.head} and $monthDay)"
+        }
+    }
+  }
+
+  /*
     * Converts a timestamp into bigint (long) in milliseconds (default Spark returns only seconds)
     * @param timestamp - Timestamp to extract milliseconds from
     * @return Milliseconds since epoch for given timestamp
