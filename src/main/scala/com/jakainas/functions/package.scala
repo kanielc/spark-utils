@@ -134,14 +134,14 @@ package object functions {
         val endSpec = s"(year = ${end.head} and (month < ${end(1)} or (month = ${end(1)} and day <= ${end(2)})))"
 
         val midYears = fullYears.length match {
-          case 0 => " and "
+          case 0 => " or "
           case 1 => s" or (year = ${fullYears.head}) or "
           case _ => s" or (year between ${fullYears.head} and ${fullYears.last}) or "
         }
 
-        if (fullYears.nonEmpty) {
+        if (fullYears.nonEmpty || start.head != end.head) { // crosses years
           s"$startSpec$midYears$endSpec"
-        } else {
+        } else { // just same year
           val monthDay = if (start(1) == end(1)) {
             s"(month = ${start(1)} and day between ${start(2)} and ${end(2)})"
           } else {
@@ -245,29 +245,23 @@ package object functions {
   implicit class SparkFunctions(val spark: SparkSession) extends AnyVal {
     /**
      * Dynamically loads a case class representing a table from its provided location
-     * @param date - What specific date partition to load from (will only use year, month, day as available in schema) - Optional
+     * @param startDate - What specific date partition to start loading from (will only use year, month, day as available in schema) - Optional
+     * @param endDate - End of date range to load.  Will default to startDate if not provided.  If no startDate, this will be ignored.
      * @tparam T - The type to load, must have a `Table` definition available
      * @return Dataset of T representing data from the given path
      */
-    def load[T: Encoder: Table](date: String = null): Dataset[T] = {
+    def load[T: Encoder: Table](startDate: String = null, endDate: String = null): Dataset[T] = {
       val table = implicitly[Table[T]]
 
       val data = spark.read.option("basePath", table.basePath).parquet(table.fullPath)
 
-      Option(date).map { date =>
-        val dateVal = parseDate(date)
-        val schema = table.schema
-        val filters = Seq("year", "month", "day")
+      val res = Option(startDate).map { date =>
+        val filter = dateRangeToSql(date, Option(endDate).getOrElse(startDate))
+        println(filter)
+        data.where(filter)
+      }.getOrElse(data).as[T]
 
-        schema.collect {
-          case f if filters.contains(f.name) =>
-            f.name match {
-              case "year" => s"year = ${dateVal.getYear}"
-              case "month" => s"month = ${dateVal.getMonthValue}"
-              case "day" => s"day = ${dateVal.getDayOfMonth}"
-            }
-        }.mkString(" and ")
-      }.fold(data) { filt => data.where(filt) }.as[T]
+      res
     }
 
     /**

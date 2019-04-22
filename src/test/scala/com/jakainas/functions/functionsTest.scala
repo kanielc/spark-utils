@@ -149,6 +149,9 @@ class functionsTest extends SparkTest {
     raw.toDS.save()
     spark.read.parquet("/tmp/footables/part-data").as[PartData].collect() should contain theSameElementsAs raw
     spark.load[PartData]().collect() should contain theSameElementsAs raw
+
+    spark.load[PartData]("2018-02-01", "2018-02-06").collect() should contain theSameElementsAs Array(raw(1))
+    spark.load[PartData]("2018-02-01", "2019-02-06").collect() should contain theSameElementsAs raw
     FileUtils.deleteDirectory(new File("/tmp/footables"))
   }
 
@@ -224,6 +227,7 @@ class functionsTest extends SparkTest {
     dateRangeToSql("2018-11-15", "2018-11-16") shouldEqual "(year = 2018 and (month = 11 and day between 15 and 16))"
     dateRangeToSql("2018-01-15", "2018-08-09") shouldEqual "(year = 2018 and ((month = 1 and day >= 15) or (month between 2 and 7) or (month = 8 and day <= 9)))"
     dateRangeToSql("2016-01-15", "2019-11-17") shouldEqual "(year = 2016 and (month > 1 or (month = 1 and day >= 15))) or (year between 2017 and 2018) or (year = 2019 and (month < 11 or (month = 11 and day <= 17)))"
+    dateRangeToSql("2018-02-01", "2019-02-06") shouldEqual "(year = 2018 and (month > 2 or (month = 2 and day >= 1))) or (year = 2019 and (month < 2 or (month = 2 and day <= 6)))"
   }
 }
 
