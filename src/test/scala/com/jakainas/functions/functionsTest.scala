@@ -229,6 +229,13 @@ class functionsTest extends SparkTest {
     dateRangeToSql("2016-01-15", "2019-11-17") shouldEqual "(year = 2016 and (month > 1 or (month = 1 and day >= 15))) or (year between 2017 and 2018) or (year = 2019 and (month < 11 or (month = 11 and day <= 17)))"
     dateRangeToSql("2018-02-01", "2019-02-06") shouldEqual "(year = 2018 and (month > 2 or (month = 2 and day >= 1))) or (year = 2019 and (month < 2 or (month = 2 and day <= 6)))"
   }
+
+  test("cast function will convert types") {
+    val data = Seq(("a1", 7, 6, 3, 9, 11.5), ("a2", 8, 7, 2, 1, 9.3)).toDF("x", "y", "year", "month", "day", "size").cache()
+    data.cast[TestData].collect() should contain theSameElementsAs Array(TestData("a1", 7), TestData("a2", 8))
+    data.cast[PartData].collect() should contain theSameElementsAs Array(PartData("a1", 7, 6, 3, 9), PartData("a2", 8, 7, 2, 1))
+    data.unpersist()
+  }
 }
 
 object functionsTest {
