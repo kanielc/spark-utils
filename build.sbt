@@ -1,15 +1,14 @@
-name := "spark-utils"
-
-version := "0.1"
-
-scalaVersion := "2.11.8"
-
-javacOptions := Seq("-source", "1.8", "-target", "1.8")
-parallelExecution in Test := false
-fork := true
-
-javaOptions ++= Seq("-Xms2G", "-Xmx2G", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled")
-scalacOptions in (Compile,doc) ++= Seq("-groups", "-implicits")
+lazy val buildSettings = Seq(
+  organization        := "com.github.kanielc",
+  name                := "spark-utils",
+  version             := "0.1-SNAPSHOT",
+  scalaVersion        := "2.11.8",
+  javacOptions        := Seq("-source", "1.8", "-target", "1.8"),
+  parallelExecution in Test := false,
+  fork                := true,
+  javaOptions ++= Seq("-Xms2G", "-Xmx2G", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled"),
+  scalacOptions in (Compile,doc) ++= Seq("-groups", "-implicits")
+)
 
 // publish to sonatype
 publishTo := {
