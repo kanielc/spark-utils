@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 import com.jakainas.table.Table
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -242,6 +243,26 @@ package object functions {
 
     def save()(implicit table: Table[T]): Unit = {
       ds.write.partitionBy(table.partitioning: _*).parquet(table.fullPath)
+    }
+
+    def saveCsv(path: String, includeHeader: Boolean = true): Unit = {
+      val tempPath = path + "-tmp"
+      val outFile = new java.io.File(path)
+      val ls = System.lineSeparator()
+
+      try {
+        ds.write.option("header", "false").csv(tempPath)
+
+        val header = if (includeHeader) ds.columns.map(c => s""""$c"""").mkString(",") + ls else ""
+        val text = header + ds.sparkSession.read.text(tempPath).as[String].collect().mkString(ls)
+        FileUtils.writeStringToFile(outFile, text)
+      } catch {
+        case e: Throwable =>
+          FileUtils.deleteQuietly(outFile)
+          throw e
+      } finally {
+        FileUtils.deleteQuietly(new java.io.File(tempPath))
+      }
     }
 
     /**

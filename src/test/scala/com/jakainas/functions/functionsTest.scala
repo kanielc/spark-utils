@@ -236,6 +236,37 @@ class functionsTest extends SparkTest {
     data.cast[PartData].collect() should contain theSameElementsAs Array(PartData("a1", 7, 6, 3, 9), PartData("a2", 8, 7, 2, 1))
     data.unpersist()
   }
+
+  test("can write to single CSV file") {
+    val raw = Seq(PartData("a", 7, 2019, 1, 10), PartData("b", 3, 2018, 2, 5)).toDS()
+    val fileLoc = "/tmp/spark-utils-csv.csv"
+    val file = new java.io.File(fileLoc)
+    FileUtils.deleteQuietly(file)
+
+    try {
+      raw.saveCsv(fileLoc)
+      val text = FileUtils.readFileToString(file)
+
+      val header = """"x","y","year","month","day""""
+      val body =
+        s"""a,7,2019,1,10
+           |b,3,2018,2,5""".stripMargin
+      text shouldEqual
+        s"""$header
+           |$body""".stripMargin
+
+      // read back through readCsv function
+      spark.readCsv(fileLoc).as[PartData].collect() should contain theSameElementsAs raw.collect()
+
+      FileUtils.deleteQuietly(file)
+
+      // no header
+      raw.saveCsv(fileLoc, includeHeader = false)
+      FileUtils.readFileToString(file) shouldEqual body
+    } finally {
+      FileUtils.deleteQuietly(file)
+    }
+  }
 }
 
 object functionsTest {
