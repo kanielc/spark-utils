@@ -245,24 +245,12 @@ class functionsTest extends SparkTest {
 
     try {
       raw.saveCsv(fileLoc)
-      val text = FileUtils.readFileToString(file)
+      val text = FileUtils.readFileToString(file).split("\n")
 
-      val header = """"x","y","year","month","day""""
-      val body =
-        s"""a,7,2019,1,10
-           |b,3,2018,2,5""".stripMargin
-      text shouldEqual
-        s"""$header
-           |$body""".stripMargin
+      text should contain theSameElementsAs Array("x,y,year,month,day", "a,7,2019,1,10", "b,3,2018,2,5")
 
       // read back through readCsv function
       spark.readCsv(fileLoc).as[PartData].collect() should contain theSameElementsAs raw.collect()
-
-      FileUtils.deleteQuietly(file)
-
-      // no header
-      raw.saveCsv(fileLoc, includeHeader = false)
-      FileUtils.readFileToString(file) shouldEqual body
     } finally {
       FileUtils.deleteQuietly(file)
     }
