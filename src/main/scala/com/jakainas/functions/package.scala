@@ -11,8 +11,8 @@ import org.apache.hadoop.io.IOUtils
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, Dataset, Encoder, SparkSession, _}
+import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructType}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe._
 
@@ -220,16 +220,41 @@ package object functions {
     }
 
     /**
-     * Converts the dataframe into the schema matching U by selecting the fields and then calling `as`
+     * Compares two Spark DataTypes to determine if they are the same or not, ignoring nullability.
+     */
+    private def sameDataType(x: DataType, y: DataType): Boolean = {
+      (x, y) match {
+        case (a: ArrayType, b: ArrayType) => sameDataType(a.elementType, b.elementType)
+        case (a: MapType, b: MapType) => sameDataType(a.keyType, b.keyType) & sameDataType(a.valueType, b.valueType)
+        case (a: StructType, b: StructType) => a.fields.zip(b.fields).map { case (d, e) => sameDataType(d.dataType, e.dataType) }.reduce(_ & _)
+        case (a: DataType, b: DataType) => a.typeName == b.typeName
+      }
+    }
+
+    /**
+     * Converts the dataframe into the schema matching U by selecting the fields and then calling `as`.
+     * Throws an exception at run time if column types are incorrect, ignoring nullability.
      *
-     * @note This does not validate on type, only field names
-     * @tparam U - The type whose schema to align to
+     * @tparam U - The type whose schema to align to.
      * @return a Dataset of type U.
      */
     def cast[U: Encoder: TypeTag]: Dataset[U] = {
-      val schema = schemaFor[U].fieldNames
+      val expSchema = schemaFor[U]
 
-      ds.select(schema.head, schema.tail: _*).as[U]
+      val expFields = expSchema.fields.sortBy(_.name)
+      val expFieldNamesSet = expSchema.fieldNames.toSet
+      val curFields = ds.schema.fields.filter(x => expFieldNamesSet.contains(x.name)).distinct.sortBy(_.name)
+
+      val wrongDataTypes = expFields.zip(curFields).collect {
+        case (x, y) if !sameDataType(x.dataType, y.dataType) => s"DataType for '${x.name}' column doesn't match expected DataType in '${typeOf[U].toString}' schema.\nExpected: ${x.dataType}\nReceived: ${y.dataType}"
+      }.mkString("\n")
+
+      if (!wrongDataTypes.isEmpty) {
+        throw new IllegalArgumentException(wrongDataTypes)
+      }
+
+      val expFieldNames = expSchema.fieldNames
+      ds.select(expFieldNames.head, expFieldNames.tail: _*).as[U]
     }
 
     /**
