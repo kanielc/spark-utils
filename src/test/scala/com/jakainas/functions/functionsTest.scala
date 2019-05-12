@@ -8,6 +8,7 @@ import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.Row
 
 class functionsTest extends SparkTest {
+
   import functionsTest._
   import org.apache.spark.sql.functions._
   import spark.implicits._
@@ -217,6 +218,76 @@ class functionsTest extends SparkTest {
       .select('value).as[Long].collect() should contain theSameElementsAs Array(1555635305131L, 1455629705178L)
   }
 
+  test("countUnique returns unique number of values partitioned by a single column") {
+    val data = Seq(
+      (1, 1),
+      (2, 1),
+      (2, 2),
+      (3, 1),
+      (3, 1)
+    ).toDF("x", "y")
+
+    val result = data.withColumn("count", countUnique('y, 'x))
+    val expected = Array(
+      Row(1, 1, 1),
+      Row(2, 1, 2),
+      Row(2, 2, 2),
+      Row(3, 1, 1),
+      Row(3, 1, 1)
+    )
+
+    result.collect should contain theSameElementsAs expected
+  }
+
+  test("countUnique returns unique number of values partitioned by multiple column") {
+    val data = Seq(
+      (1, 1, 1),
+      (1, 1, 1),
+      (1, 1, 1),
+      (2, 1, 1),
+      (2, 1, 1),
+      (2, 2, 1),
+      (3, 1, 1),
+      (3, 1, 2),
+      (3, 2, 1)
+    ).toDF("x", "y", "z")
+
+    val result = data.withColumn("count", countUnique('z, 'x, 'y))
+    val expected = Array(
+      Row(1, 1, 1, 1),
+      Row(1, 1, 1, 1),
+      Row(1, 1, 1, 1),
+      Row(2, 1, 1, 1),
+      Row(2, 1, 1, 1),
+      Row(2, 2, 1, 1),
+      Row(3, 1, 1, 2),
+      Row(3, 1, 2, 2),
+      Row(3, 2, 1, 1)
+    )
+
+    result.collect should contain theSameElementsAs expected
+  }
+
+  test("countUnique returns unique number of values in entire column when no partitioning columns are specified") {
+    val data = Seq(
+      (1, 1),
+      (2, 1),
+      (2, 2),
+      (3, 1),
+      (3, 1)
+    ).toDF("x", "y")
+
+    val result = data.withColumn("count", countUnique('y))
+    val expected = Array(
+      Row(1, 1, 2),
+      Row(2, 1, 2),
+      Row(2, 2, 2),
+      Row(3, 1, 2), Row(3, 1, 2)
+    )
+
+    result.collect should contain theSameElementsAs expected
+  }
+
   test("return a range of dates as an SQL query") {
     dateRangeToSql("2017-01-09", "2017-01-09") shouldEqual "year = 2017 and month = 1 and day = 9"
     dateRangeToSql("2018-11-01", "2018-11-29") shouldEqual "(year = 2018 and (month = 11 and day between 1 and 29))"
@@ -258,12 +329,15 @@ class functionsTest extends SparkTest {
 }
 
 object functionsTest {
+
   case class TestData(x: String, y: Int)
+
   object TestData {
     implicit val tableConf = new Table[TestData] with DailyPartitioning with LogTables
   }
 
   case class PartData(x: String, y: Int, year: Int, month: Int, day: Int)
+
   object PartData {
     implicit val tableConf: Table[PartData] = new Table[PartData] with DailyPartitioning with LogTables
   }
@@ -271,5 +345,6 @@ object functionsTest {
   trait LogTables extends TableConfig {
     override def basePath: String = "/tmp/footables"
   }
+
 }
 

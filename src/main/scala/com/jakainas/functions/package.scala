@@ -176,6 +176,20 @@ package object functions {
    */
   def millis(timestamp: Column): Column = (timestamp.cast("double") * 1000).cast("bigint")
 
+  /**
+   * countDistinct equivalent for window operations.
+   * Distinct window operations are not currently supported by Spark so we can't just use countDistinct.
+   *
+   * TODO: see if performance can be improved using a UDAF or some other approach.
+   *
+   * @param countCol : Column values to count.
+   * @param partCols : One or more columns to partition the dataset by.
+   * @return : Count of unique values in countCol per partitionCols.
+   */
+  def countUnique(countCol: Column, partCols: Column*): Column = {
+    size(collect_set(countCol).over(Window.partitionBy(partCols: _*)))
+  }
+
   implicit class DatasetFunctions[T](private val ds: Dataset[T]) extends AnyVal {
 
     import ds.sparkSession.implicits._
